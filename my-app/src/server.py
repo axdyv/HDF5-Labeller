@@ -11,8 +11,6 @@ import os
 import shutil
 from io import BytesIO
 import zipfile
-import pydicom
-import nibabel as nib
 
 app = Flask(__name__,)
 CORS(app)
