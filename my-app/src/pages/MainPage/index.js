@@ -177,7 +177,6 @@ function MainPage() {
         setLabelGallery(response.data);
         setLabelGalleryModalIsOpen(true);
       })
-    setPreviewFile(file)
       .catch(error => {
         console.error('Error fetching folder images:', error);
         setError('Error fetching folder images.');
@@ -289,7 +288,8 @@ function MainPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
         <Paper elevation={3} style={{ width: '100%', margin: '0px 12px', padding: '12px' }}>
           <div>
-          <FormControl fullWidth margin="normal">
+            <h2 style={{marginBottom: 12}}>Upload HDF5 File</h2>
+            <FormControl fullWidth margin="normal">
               <InputLabel id="file-type-label">File Type</InputLabel>
               <Select
                 labelId="file-type-label"
@@ -297,10 +297,8 @@ function MainPage() {
                 onChange={(e) => setFileType(e.target.value)}
               >
                 <MenuItem value="HDF5">HDF5</MenuItem>
-                <MenuItem value="DICOM">DICOM</MenuItem>
               </Select>
             </FormControl>
-            <h2 style={{marginBottom: 12}}>Upload HDF5 File</h2>
             <CustomFileUpload files={selectedFile} setFiles={handleFileChange} accept={fileType === 'HDF5' ? '.h5,.hdf5' : '.zip'} disabled={uploadingFileLoading || !fileType} />
             <Button onClick={handleUpload} variant="contained" style={{ width: '100%' }} disabled={!fileType || loading}>
               {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px'}}/>} {uploadingFileLoading ? 'Uploading File' : 'Upload File'}
@@ -342,7 +340,7 @@ function MainPage() {
                                   }
                                   {<Tooltip title="Label File">
                                       <IconButton>
-                                        <BorderColorIcon onClick={() => openImageGalleryModal(file)}/>  
+                                        <BorderColorIcon onClick={() => openLabelGalleryModal(file)}/>  
                                       </IconButton>
                                     </Tooltip>
                                   }
@@ -358,6 +356,11 @@ function MainPage() {
                                       <CloudDownloadIcon onClick={() => downloadFile(file)}/>
                                     </IconButton>
                                   </Tooltip>
+                                  <Tooltip title="Label File">
+                                      <IconButton>
+                                        <BorderColorIcon onClick={() => openModal(`http://127.0.0.1:5000/output-files/${file}`)}/>  
+                                      </IconButton>
+                                    </Tooltip>
                                 </td>
                               </>
                             }
