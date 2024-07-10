@@ -17,23 +17,21 @@ import Dialog from '@mui/material/Dialog';
 function MainPage() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [outputHDF5Files, setOutputHDF5Files] = useState([]);
-  const [outputDICOMFiles, setOutputDICOMFiles] = useState([]);
   const [currentHDF5Path, setCurrentHDF5Path] = useState('');
-  const [currentDICOMPath, setCurrentDICOMPath] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [fileType, setFileType] = useState('');
+  const [filename, setFilename] = useState('');
   const [uploadingFileLoading, setUploadingFileLoading] = useState(false)
 
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState(null);
   const [imageGalleryModalIsOpen, setImageGalleryModalIsOpen] = useState(false);
   const [imageGallery, setImageGallery] = useState([]);
-  const [labelGalleryModalIsOpen, setLabelGalleryModalIsOpen] = useState(false);
-  const [labelGallery, setLabelGallery] = useState([]);
   const [metadataTextFiles, setMetadataTextFiles] = useState({});
   const [currentFolder, setCurrentFolder] = useState('');
   const [metadataTextModalIsOpen, setMetadataTextModalIsOpen] = useState(false);
+  const [label, setLabel] = useState('image');
   
 
   const handleFileChange = (files) => {
@@ -53,7 +51,7 @@ function MainPage() {
       })
       .then(response => {
         console.log(`${fileType} file upload successful:`, response.data);
-        fileType === 'HDF5' ? fetchOutputHDF5Files() : fetchOutputDICOMFiles(); // Refresh the output files list after upload
+        fileType === 'HDF5' ? fetchOutputHDF5Files() : fetchOutputHDF5Files(); // Refresh the output files list after upload
       })
       .catch(error => {
         console.error(`Error uploading ${fileType} file:`, error);
@@ -79,24 +77,6 @@ function MainPage() {
       .catch(error => {
         console.error('Error fetching HDF5 output files:', error);
         setError('Error fetching HDF5 output files.');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
-  const fetchOutputDICOMFiles = (path = '') => {
-    setLoading(true);
-    axios.get(`http://127.0.0.1:5000/output-files?path=${path}`)
-      .then(response => {
-        console.log('Fetched DICOM output files:', response.data);
-        setOutputDICOMFiles(response.data);
-        setCurrentDICOMPath(path);
-        setError(null);
-      })
-      .catch(error => {
-        console.error('Error fetching DICOM output files:', error);
-        setError('Error fetching DICOM output files.');
       })
       .finally(() => {
         setLoading(false);
@@ -171,18 +151,6 @@ function MainPage() {
       });
   };
 
-  const openLabelGalleryModal = (file, folder) => {
-    axios.get(`http://127.0.0.1:5000/output-files/folder-images?folder=${folder}`)
-      .then(response => {
-        setLabelGallery(response.data);
-        setLabelGalleryModalIsOpen(true);
-      })
-      .catch(error => {
-        console.error('Error fetching folder images:', error);
-        setError('Error fetching folder images.');
-      });
-  };
-
   const closeImageGalleryModal = () => {
     setImageGallery([]);
     setImageGalleryModalIsOpen(false);
@@ -206,14 +174,25 @@ function MainPage() {
       });
   };
 
+  const saveLabel = async () => {
+    try {
+      const response = await axios.post('http://127.0.0.1:5000/save-label', {
+        filename: filename,
+        label: label,
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      console.log(response.data.message);
+    } catch (error) {
+      console.error('Error saving label:', error.response?.data || error.message);
+    }
+  };
+
   const handleHDF5DirectoryClick = (folder) => {
     const newPath = `${currentHDF5Path}/${folder}`;
     fetchOutputHDF5Files(newPath);
-  };
-
-  const handleDICOMDirectoryClick = (folder) => {
-    const newPath = `${currentDICOMPath}/${folder}`;
-    fetchOutputDICOMFiles(newPath);
   };
 
   const handleHDF5BackClick = () => {
@@ -223,13 +202,6 @@ function MainPage() {
     fetchOutputHDF5Files(newPath);
   };
 
-  const handleDICOMBackClick = () => {
-    const pathSegments = currentDICOMPath.split('/').filter(segment => segment);
-    pathSegments.pop();
-    const newPath = pathSegments.join('/');
-    fetchOutputDICOMFiles(newPath);
-  };
-
   const renderHDF5Breadcrumbs = () => {
     const paths = currentHDF5Path.split('/').filter(path => path);
     return (
@@ -237,20 +209,6 @@ function MainPage() {
         <span onClick={() => fetchOutputHDF5Files('')}>Home</span>
         {paths.map((path, index) => (
           <span key={index} onClick={() => fetchOutputHDF5Files(paths.slice(0, index + 1).join('/'))}>
-            {path}
-          </span>
-        ))}
-      </div>
-    );
-  };
-
-  const renderDICOMBreadcrumbs = () => {
-    const paths = currentDICOMPath.split('/').filter(path => path);
-    return (
-      <div className="breadcrumbs">
-        <span onClick={() => fetchOutputDICOMFiles('')}>Home</span>
-        {paths.map((path, index) => (
-          <span key={index} onClick={() => fetchOutputDICOMFiles(paths.slice(0, index + 1).join('/'))}>
             {path}
           </span>
         ))}
@@ -307,9 +265,8 @@ function MainPage() {
           <div className="output-section">
             <h2>Output Files</h2>
             {error && <p className="error">{error}</p>}
-            {fileType === 'HDF5' ? renderHDF5Breadcrumbs() : renderDICOMBreadcrumbs()}
+            {fileType === 'HDF5' ? renderHDF5Breadcrumbs() : renderHDF5Breadcrumbs()}
             {fileType === 'HDF5' && currentHDF5Path && <button onClick={handleHDF5BackClick}>Back</button>}
-            {fileType === 'DICOM' && currentDICOMPath && <button onClick={handleDICOMBackClick}>Back</button>}
             {fileType === 'HDF5' && (
               outputHDF5Files.length === 0 ? (
                 <p>No HDF5 files available.</p>
@@ -340,7 +297,7 @@ function MainPage() {
                                   }
                                   {<Tooltip title="Label File">
                                       <IconButton>
-                                        <BorderColorIcon onClick={() => openLabelGalleryModal(file)}/>  
+                                        <BorderColorIcon onClick={() => openImageGalleryModal(file)}/>  
                                       </IconButton>
                                     </Tooltip>
                                   }
@@ -371,56 +328,34 @@ function MainPage() {
                  </table>
                 )
             )} 
-            {fileType === 'DICOM' && (
-              outputDICOMFiles.length === 0 ? (
-                <p>No DICOM files available.</p>
-              ) : (
-                <table>
-                  {outputDICOMFiles.map((file, index) => {
-                    console.log('file ==>', file)
-                    const isDirectory = !file.includes('.');
-                    console.log('is directory====>', isDirectory)
-                    return (
-                      <tr key={index}>
-                        {isDirectory && (
-                          <>
-                            <td>
-                            <span>{file}</span>  
-                            </td>
-                            <td>
-                              {<Tooltip title="Download Folder">
-                                  <IconButton>
-                                    <CloudDownloadIcon onClick={() => downloadFolder(file)} />  
-                                  </IconButton>
-                                </Tooltip>
-                              }
-                              {<Tooltip title="View Files">
-                                  <IconButton>
-                                    <VisibilityIcon onClick={() => fetchMetadataAndTextFiles(file)}/>  
-                                  </IconButton>
-                                </Tooltip>
-                              }
-                              {<Tooltip title="View Folder">
-                                  <IconButton>
-                                    <FolderIcon onClick={() => openImageGalleryModal(file)}/>  
-                                  </IconButton>
-                                </Tooltip>
-                              }
-                            </td>
-                          </> 
-                        )}
-                      </tr>
-                    );
-                  })}
-                </table>
-              )
-            )}
           </div>
         </Paper>
       </div>
 
       <Dialog open={modalIsOpen} onClose={closeModal} maxWidth="lg" fullWidth={true}>
         <div style={{ textAlign: 'center' }}>
+        <div>
+      <input
+        type="text"
+        placeholder="Filename"
+        value={filename}
+        onChange={(e) => setFilename(e.target.value)}
+      />
+      <FormControl fullWidth margin="normal">
+              <InputLabel id="file-type-label">File Type</InputLabel>
+              <Select
+                labelId="file-type-label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+              >
+                <MenuItem value="images">Images</MenuItem>
+                <MenuItem value="labels">Labels</MenuItem>
+                <MenuItem value="data">Data</MenuItem>
+              </Select>
+            </FormControl>
+          <Button variant='contained' onClick={closeModal} style={{ marginTop: '20px' }}>Close</Button>
+          <Button type="submit" onClick={saveLabel} style={{ marginTop: '20px' }}>Save Label</Button>
+    </div>
           {previewFile && (
             <div>
               {previewFile.match(/.(jpeg|jpg|png|gif)$/i) ? (
@@ -430,13 +365,32 @@ function MainPage() {
               )}
             </div>
           )}
-          <Button variant='contained' onClick={closeModal} style={{ marginTop: '20px' }}>Close</Button>
         </div>
       </Dialog>
 
       <Dialog open={imageGalleryModalIsOpen} onClose={closeImageGalleryModal} fullWidth={true} maxWidth="lg">
         <div style={{ textAlign: 'center' }}>
           <h2>Image Gallery</h2>
+          <input
+        type="text"
+        placeholder="Filename"
+        value={filename}
+        onChange={(e) => setFilename(e.target.value)}
+          />
+          <FormControl fullWidth margin="normal">
+              <InputLabel id="file-type-label">File Type</InputLabel>
+              <Select
+                labelId="file-type-label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+              >
+                <MenuItem value="images">Images</MenuItem>
+                <MenuItem value="labels">Labels</MenuItem>
+                <MenuItem value="data">Data</MenuItem>
+              </Select>
+            </FormControl>
+          <Button variant='contained' onClick={closeModal} style={{ marginTop: '20px' }}>Close</Button>
+          <Button type="submit" onClick={saveLabel} style={{ marginTop: '20px' }}>Save Label</Button>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
             {imageGallery.map((image, index) => (
               <LazyLoadImage key={index} src={image} alt={`Gallery ${index}`} style={{ width: '200px', margin: '10px' }} />
@@ -454,7 +408,10 @@ function MainPage() {
         </div>
       </Dialog>
     </React.Fragment>
+
   );
 }
+
+
 
 export default MainPage;

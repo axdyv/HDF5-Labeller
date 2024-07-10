@@ -20,6 +20,7 @@ OUTPUT_FOLDER = 'output'
 METADATA_FOLDER = 'metadata'
 isHDF5 = False
 isDicom = False
+labels = {}
 
 def setup_folders():
     if os.path.exists(OUTPUT_FOLDER):
@@ -226,6 +227,43 @@ def get_folder_metadata_text():
     })
 
 # End of Upload/Output routes
+
+@app.route('/save-label', methods=['POST'])
+@cross_origin()
+def save_label():
+    data = request.get_json()
+
+    # Debug log to check if we are receiving data
+    app.logger.debug(f"Received data: {data}")
+
+    filename = data.get('filename')
+    print(filename)
+    label = data.get('label')
+    print(label)
+
+    if not filename or not label:
+        app.logger.error("Invalid data: Missing filename or label")
+        return jsonify({"error": "Filename and label are required"}), 400
+
+    # Save the label associated with the filename
+    labels[filename] = label
+    app.logger.debug(f"Label saved: {filename} -> {label}")
+
+    return jsonify({"message": "Label saved successfully"}), 200
+
+
+@app.route('/get-labels', methods=['GET'])
+@cross_origin()
+def get_labels():
+    labels_file = 'labels.json'
+
+    if os.path.exists(labels_file):
+        with open(labels_file, 'r') as f:
+            labels_data = json.load(f)
+        return jsonify(labels_data)
+    else:
+        return jsonify({}), 200
+
 
 # HDF5 Parser
 def mainHDF5Method(file_path):
