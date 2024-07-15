@@ -11,6 +11,7 @@ import os
 import shutil
 from io import BytesIO
 import zipfile
+import pylev
 
 app = Flask(__name__,)
 CORS(app)
@@ -32,6 +33,8 @@ def setup_folders():
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     os.makedirs('outputView', exist_ok=True)
+    labels = {}
+    
 
 
 # Upload/output Routes
@@ -239,18 +242,63 @@ def save_label():
     filename = data.get('filename')
     print(filename)
     label = data.get('label')
-    print(label)
 
     if not filename or not label:
         app.logger.error("Invalid data: Missing filename or label")
         return jsonify({"error": "Filename and label are required"}), 400
 
     # Save the label associated with the filename
-    labels[filename] = label
+    if (filename != "nestedDict.json"):
+        labels[filename] = label
     app.logger.debug(f"Label saved: {filename} -> {label}")
+    numFilesToLabel = len(os.listdir('output')) - 1
+    app.logger.debug(f"numFilesToLabel: {numFilesToLabel}")
+    output_json_path = os.path.join("labelInfo", "firstFile.json")
+    app.logger.debug(f"numLabels: {len(labels)}")
+
+    if (len(labels) == numFilesToLabel):
+        if (not os.path.isfile(output_json_path)):
+            os.makedirs("labelInfo", exist_ok=True)
+            with open(output_json_path, 'w') as json_file:
+                json.dump(labels, json_file, indent=True)
+        else:
+            # compare similarity of images, labels, and data
+            app.logger.debug(f"came into else")
+            with open(os.path.join("labelInfo", "firstFile.json"), 'r') as filePath:
+                ogDict = json.load(filePath)
+            print(ogDict)
+            print(labels)
+            ogImages = 0
+            newImages = 0
+            ogLabels = 0
+            newLabels = 0
+            ogData = 0
+            newData = 0
+            for files in ogDict.values():
+                if (files == "images"):
+                    ogImages += 1
+                if (files == "labels"):
+                    ogLabels += 1
+                if (files == "data"):
+                    ogData += 1
+            for files in labels.values():
+                if (files == "images"):
+                    newImages += 1
+                if (files == "labels"):
+                    newLabels += 1
+                if (files == "data"):
+                    newData += 1
+            app.logger.debug(f"ogImages: {ogImages}")
+            app.logger.debug(f"newImages: {newImages}")
+            app.logger.debug(f"ogLabels: {ogLabels}")
+            app.logger.debug(f"newLabels: {newLabels}")
+            app.logger.debug(f"ogData: {ogData}")
+            app.logger.debug(f"newData: {ogData}")
+            print(abs(ogImages - newImages) + abs(ogLabels - newLabels) + abs(ogData - newData))
+
+                
 
     return jsonify({"message": "Label saved successfully"}), 200
-
 
 @app.route('/get-labels', methods=['GET'])
 @cross_origin()
