@@ -32,7 +32,23 @@ function MainPage() {
   const [currentFolder, setCurrentFolder] = useState('');
   const [metadataTextModalIsOpen, setMetadataTextModalIsOpen] = useState(false);
   const [label, setLabel] = useState('image');
-  
+  const [labelModal, setLabelModal] = useState(false);
+
+  const checkCondition = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/ask-label');
+      const data = await response.json();
+      setLabelModal(data.show_modal);
+    } catch (error) {
+      console.error('Error checking condition:', error);
+    }
+  };
+
+  checkCondition();
+
+  const closeLabelModal = () => {
+    setLabelModal(false);
+  };
 
   const handleFileChange = (files) => {
     setSelectedFile(files);
@@ -261,6 +277,29 @@ function MainPage() {
             <Button onClick={handleUpload} variant="contained" style={{ width: '100%' }} disabled={!fileType || loading}>
               {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px'}}/>} {uploadingFileLoading ? 'Uploading File' : 'Upload File'}
             </Button>
+            <div>
+              <Modal
+                  isOpen={modalIsOpen}
+                  onRequestClose={closeModal}
+                  contentLabel="User Input Modal"
+                >
+              <h2>User Input Required</h2>
+              <FormControl fullWidth margin="normal">
+              <InputLabel id="file-type-label">File Type</InputLabel>
+              <Select
+                labelId="file-type-label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+              >
+                <MenuItem value="images">Images</MenuItem>
+                <MenuItem value="labels">Labels</MenuItem>
+                <MenuItem value="data">Data</MenuItem>
+              </Select>
+            </FormControl>
+          <Button variant='contained' onClick={closeModal} style={{ marginTop: '20px' }}>Close</Button>
+          <Button type="submit" onClick={saveLabel} style={{ marginTop: '20px' }}>Save Label</Button>
+              </Modal>
+            </div>
           </div>
           <div className="output-section">
             <h2>Output Files</h2>
