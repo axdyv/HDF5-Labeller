@@ -11,7 +11,8 @@ import os
 import shutil
 from io import BytesIO
 import zipfile
-import pylev
+from collections import deque
+import time
 
 app = Flask(__name__,)
 CORS(app)
@@ -33,7 +34,6 @@ def setup_folders():
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     os.makedirs('outputView', exist_ok=True)
-    labels = {}
     
 
 
@@ -231,75 +231,6 @@ def get_folder_metadata_text():
 
 # End of Upload/Output routes
 
-@app.route('/save-label', methods=['POST'])
-@cross_origin()
-def save_label():
-    data = request.get_json()
-
-    # Debug log to check if we are receiving data
-    app.logger.debug(f"Received data: {data}")
-
-    filename = data.get('filename')
-    print(filename)
-    label = data.get('label')
-
-    if not filename or not label:
-        app.logger.error("Invalid data: Missing filename or label")
-        return jsonify({"error": "Filename and label are required"}), 400
-
-    # Save the label associated with the filename
-    if (filename != "nestedDict.json"):
-        labels[filename] = label
-    app.logger.debug(f"Label saved: {filename} -> {label}")
-    numFilesToLabel = len(os.listdir('output')) - 1
-    app.logger.debug(f"numFilesToLabel: {numFilesToLabel}")
-    output_json_path = os.path.join("labelInfo", "firstFile.json")
-    app.logger.debug(f"numLabels: {len(labels)}")
-
-    if (len(labels) == numFilesToLabel):
-        if (not os.path.isfile(output_json_path)):
-            os.makedirs("labelInfo", exist_ok=True)
-            with open(output_json_path, 'w') as json_file:
-                json.dump(labels, json_file, indent=True)
-        else:
-            # compare similarity of images, labels, and data
-            app.logger.debug(f"came into else")
-            with open(os.path.join("labelInfo", "firstFile.json"), 'r') as filePath:
-                ogDict = json.load(filePath)
-            print(ogDict)
-            print(labels)
-            ogImages = 0
-            newImages = 0
-            ogLabels = 0
-            newLabels = 0
-            ogData = 0
-            newData = 0
-            for files in ogDict.values():
-                if (files == "images"):
-                    ogImages += 1
-                if (files == "labels"):
-                    ogLabels += 1
-                if (files == "data"):
-                    ogData += 1
-            for files in labels.values():
-                if (files == "images"):
-                    newImages += 1
-                if (files == "labels"):
-                    newLabels += 1
-                if (files == "data"):
-                    newData += 1
-            app.logger.debug(f"ogImages: {ogImages}")
-            app.logger.debug(f"newImages: {newImages}")
-            app.logger.debug(f"ogLabels: {ogLabels}")
-            app.logger.debug(f"newLabels: {newLabels}")
-            app.logger.debug(f"ogData: {ogData}")
-            app.logger.debug(f"newData: {ogData}")
-            print(abs(ogImages - newImages) + abs(ogLabels - newLabels) + abs(ogData - newData))
-
-                
-
-    return jsonify({"message": "Label saved successfully"}), 200
-
 @app.route('/get-labels', methods=['GET'])
 @cross_origin()
 def get_labels():
@@ -316,16 +247,62 @@ def get_labels():
 # HDF5 Parser
 def mainHDF5Method(file_path):
     isHDF5 = True
-    path_to_dataset = {}
-    with h5py.File(file_path, 'r') as file:
-        file.visititems(lambda name, obj: traverse_hdf5(name, obj, path_to_dataset))
+    if (not os.path.exists("labelInfo/sampleStructure.json")):
+        # create a format based on sample file and ask user to annotate labels
+        os.makedirs("labelInfo")
+        path_to_dataset = {}
+        with h5py.File(file_path, 'r') as file:
+            file.visititems(lambda name, obj: sample_file_traversal(name, obj, path_to_dataset, True))
+        output_json_path = os.path.join('labelInfo', 'sampleStructure.json')
+        with open(output_json_path, 'w') as json_file:
+            json.dump(path_to_dataset, json_file, indent=True)
+        print(labels)
+    else:
+        # time to verify and parse the new file
+        with open('labelInfo/sampleStructure.json', 'r') as structureFile:
+            sampleStructure = json.load(structureFile)
+        path_to_dataset = {}
+        with h5py.File(file_path, 'r') as file:
+            file.visititems(lambda name, obj: sample_file_traversal(name, obj, path_to_dataset, False))
+        print(path_to_dataset)
+        print(sampleStructure)
+        print(path_to_dataset == sampleStructure)
+        if (path_to_dataset != sampleStructure):
+            return jsonify({'file does not match structure'}), 400
+        # with h5py.File(file_path, 'r') as file:
+        #     file.visititems(lambda name, obj: hdf5_ver_parsing(name, obj, path_to_dataset))
+        # output_json_path = os.path.join('output', 'nestedDict.json')
+        # with open(output_json_path, 'w') as json_file:
+        #     json.dump(path_to_dataset, json_file, indent=True)
 
-    output_json_path = os.path.join('output', 'nestedDict.json')
-    with open(output_json_path, 'w') as json_file:
-        json.dump(path_to_dataset, json_file, indent=True)
-
-def traverse_hdf5(name, obj, path_to_dataset):
+def sample_file_traversal(name, obj, path_to_dataset, labelCond):
     if isinstance(obj, h5py.Group):
+        currentDataset = ""
+        if '/' in name:
+            current_dict = path_to_dataset
+            folders = name.split('/')
+            for folder in folders[:-1]:
+                current_dict = current_dict.setdefault(folder, {})
+            current_dict[folders[-1]] = {}
+        else:
+            path_to_dataset[name] = {}
+        print(name)
+    elif isinstance(obj, h5py.Dataset):
+        current_dict = path_to_dataset
+        filePath = ""
+        folders = name.split('/')
+        for folder in folders[:-1]:
+            current_dict = current_dict.setdefault(folder, {})
+            filePath = filePath + folder
+        dataset_name = folders[-1]
+        current_dict[dataset_name] = os.path.join('output', filePath + dataset_name + '(insert_type)')
+        print(filePath + dataset_name)
+        if (labelCond):
+            labels[filePath + dataset_name] = ''
+
+def hdf5_ver_parsing(name, obj, path_to_dataset):
+    if isinstance(obj, h5py.Group):
+        currentDataset = ""
         if '/' in name:
             current_dict = path_to_dataset
             folders = name.split('/')
@@ -342,20 +319,52 @@ def traverse_hdf5(name, obj, path_to_dataset):
             current_dict = current_dict.setdefault(folder, {})
             filePath = filePath + folder
         dataset_name = folders[-1]
-
         if (("X" in name or "data" in name or "image" in name) and obj.ndim >= 2):
             image_folder = os.path.join('output', filePath + dataset_name + "Images")
             os.makedirs(image_folder, exist_ok=True)
             imageDatasetHandling(obj, image_folder)
-            current_dict[dataset_name] = image_folder
+            current_dict[dataset_name] = image_folder + "***"
         elif obj.ndim >= 2:
             data_path = os.path.join('output', filePath + dataset_name + "Data.npy")
             np.save(data_path, np.array(obj))
-            current_dict[dataset_name] = data_path
+            current_dict[dataset_name] = data_path + "***"
         elif obj.ndim == 1:
             labels_path = os.path.join('output', filePath + dataset_name + "Labels.json")
             save_labels(obj, labels_path)
-            current_dict[dataset_name] = labels_path
+            current_dict[dataset_name] = labels_path + "***"
+
+def traverse_hdf5(name, obj, path_to_dataset):
+    if isinstance(obj, h5py.Group):
+        currentDataset = ""
+        if '/' in name:
+            current_dict = path_to_dataset
+            folders = name.split('/')
+            for folder in folders[:-1]:
+                current_dict = current_dict.setdefault(folder, {})
+            current_dict[folders[-1]] = {}
+        else:
+            path_to_dataset[name] = {}
+    elif isinstance(obj, h5py.Dataset):
+        current_dict = path_to_dataset
+        filePath = ""
+        folders = name.split('/')
+        for folder in folders[:-1]:
+            current_dict = current_dict.setdefault(folder, {})
+            filePath = filePath + folder
+        dataset_name = folders[-1]
+        if (("X" in name or "data" in name or "image" in name) and obj.ndim >= 2):
+            image_folder = os.path.join('output', filePath + dataset_name + "Images")
+            os.makedirs(image_folder, exist_ok=True)
+            imageDatasetHandling(obj, image_folder)
+            current_dict[dataset_name] = image_folder + "***"
+        elif obj.ndim >= 2:
+            data_path = os.path.join('output', filePath + dataset_name + "Data.npy")
+            np.save(data_path, np.array(obj))
+            current_dict[dataset_name] = data_path + "***"
+        elif obj.ndim == 1:
+            labels_path = os.path.join('output', filePath + dataset_name + "Labels.json")
+            save_labels(obj, labels_path)
+            current_dict[dataset_name] = labels_path + "***"
 
 def save_labels(obj, labels_path):
     labels = np.array(obj)
