@@ -32,10 +32,18 @@ function MainPage() {
   const [currentFolder, setCurrentFolder] = useState('');
   const [metadataTextModalIsOpen, setMetadataTextModalIsOpen] = useState(false);
   const [label, setLabel] = useState('image');
+  const [filesToLabel, setFilesToLabel] = useState({});
   
 
   const handleFileChange = (files) => {
     setSelectedFile(files);
+  };
+
+  const getLabels = () => {
+    fetch('/get-labels')
+      .then(response => response.json())
+      .then(filesToLabel => setFilesToLabel(filesToLabel))
+      .catch(error => console.error('Error fetching data:', error));
   };
 
   const handleUpload = () => {
@@ -49,6 +57,9 @@ function MainPage() {
           'Content-Type': 'multipart/form-data',
         }
       })
+      console.log('about to call get labels')
+      getLabels()
+
       .then(response => {
         console.log(`${fileType} file upload successful:`, response.data);
         fileType === 'HDF5' ? fetchOutputHDF5Files() : fetchOutputHDF5Files(); // Refresh the output files list after upload
@@ -261,6 +272,12 @@ function MainPage() {
             <Button onClick={handleUpload} variant="contained" style={{ width: '100%' }} disabled={!fileType || loading}>
               {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px'}}/>} {uploadingFileLoading ? 'Uploading File' : 'Upload File'}
             </Button>
+          </div>
+          <div className="App">
+            <h1>Data from Flask</h1>
+            <p>traindata: {filesToLabel.traindata}</p>
+            <p>traintarget: {filesToLabel.traintarget}</p>
+            <p>testdata: {filesToLabel.testdata}</p>
           </div>
           <div className="output-section">
             <h2>Output Files</h2>

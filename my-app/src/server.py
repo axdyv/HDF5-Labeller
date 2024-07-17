@@ -234,14 +234,8 @@ def get_folder_metadata_text():
 @app.route('/get-labels', methods=['GET'])
 @cross_origin()
 def get_labels():
-    labels_file = 'labels.json'
-
-    if os.path.exists(labels_file):
-        with open(labels_file, 'r') as f:
-            labels_data = json.load(f)
-        return jsonify(labels_data)
-    else:
-        return jsonify({}), 200
+    print('came into get labels')
+    return jsonify(labels)
 
 
 # HDF5 Parser
@@ -298,7 +292,7 @@ def sample_file_traversal(name, obj, path_to_dataset, labelCond):
         current_dict[dataset_name] = os.path.join('output', filePath + dataset_name + '(insert_type)')
         print(filePath + dataset_name)
         if (labelCond):
-            labels[filePath + dataset_name] = ''
+            labels[filePath + dataset_name] = 'this is great'
 
 def hdf5_ver_parsing(name, obj, path_to_dataset):
     if isinstance(obj, h5py.Group):
