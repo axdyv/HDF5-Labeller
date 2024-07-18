@@ -231,11 +231,17 @@ def get_folder_metadata_text():
 
 # End of Upload/Output routes
 
-@app.route('/get-labels', methods=['GET'])
+@app.route('/api/data', methods=['GET'])
 @cross_origin()
-def get_labels():
+def get_data():
     print('came into get labels')
-    return jsonify(labels)
+    # return jsonify(labels)
+    data = {
+        "name": "John Doe",
+        "age": 30,
+        "city": "New York"
+    }
+    return jsonify(data)
 
 
 # HDF5 Parser
@@ -250,7 +256,6 @@ def mainHDF5Method(file_path):
         output_json_path = os.path.join('labelInfo', 'sampleStructure.json')
         with open(output_json_path, 'w') as json_file:
             json.dump(path_to_dataset, json_file, indent=True)
-        print(labels)
     else:
         # time to verify and parse the new file
         with open('labelInfo/sampleStructure.json', 'r') as structureFile:
@@ -258,9 +263,6 @@ def mainHDF5Method(file_path):
         path_to_dataset = {}
         with h5py.File(file_path, 'r') as file:
             file.visititems(lambda name, obj: sample_file_traversal(name, obj, path_to_dataset, False))
-        print(path_to_dataset)
-        print(sampleStructure)
-        print(path_to_dataset == sampleStructure)
         if (path_to_dataset != sampleStructure):
             return jsonify({'file does not match structure'}), 400
         # with h5py.File(file_path, 'r') as file:
@@ -280,7 +282,6 @@ def sample_file_traversal(name, obj, path_to_dataset, labelCond):
             current_dict[folders[-1]] = {}
         else:
             path_to_dataset[name] = {}
-        print(name)
     elif isinstance(obj, h5py.Dataset):
         current_dict = path_to_dataset
         filePath = ""
@@ -290,7 +291,6 @@ def sample_file_traversal(name, obj, path_to_dataset, labelCond):
             filePath = filePath + folder
         dataset_name = folders[-1]
         current_dict[dataset_name] = os.path.join('output', filePath + dataset_name + '(insert_type)')
-        print(filePath + dataset_name)
         if (labelCond):
             labels[filePath + dataset_name] = 'this is great'
 

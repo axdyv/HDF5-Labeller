@@ -33,18 +33,20 @@ function MainPage() {
   const [metadataTextModalIsOpen, setMetadataTextModalIsOpen] = useState(false);
   const [label, setLabel] = useState('image');
   const [filesToLabel, setFilesToLabel] = useState({});
+  const [data, setData] = useState({});
   
 
   const handleFileChange = (files) => {
     setSelectedFile(files);
   };
 
-  const getLabels = () => {
-    fetch('/get-labels')
+  useEffect(() => {
+    fetch('/api/data')
       .then(response => response.json())
-      .then(filesToLabel => setFilesToLabel(filesToLabel))
+      .then(data => setData(data))
       .catch(error => console.error('Error fetching data:', error));
-  };
+  }, []);
+
 
   const handleUpload = () => {
     if (selectedFile) {
@@ -57,8 +59,6 @@ function MainPage() {
           'Content-Type': 'multipart/form-data',
         }
       })
-      console.log('about to call get labels')
-      getLabels()
 
       .then(response => {
         console.log(`${fileType} file upload successful:`, response.data);
@@ -275,9 +275,9 @@ function MainPage() {
           </div>
           <div className="App">
             <h1>Data from Flask</h1>
-            <p>traindata: {filesToLabel.traindata}</p>
-            <p>traintarget: {filesToLabel.traintarget}</p>
-            <p>testdata: {filesToLabel.testdata}</p>
+            <p>Name: {data.name}</p>
+            <p>Age: {data.age}</p>
+            <p>City: {data.city}</p>
           </div>
           <div className="output-section">
             <h2>Output Files</h2>
@@ -425,7 +425,7 @@ function MainPage() {
         </div>
       </Dialog>
     </React.Fragment>
-
+    
   );
 }
 
