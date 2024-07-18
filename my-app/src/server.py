@@ -126,6 +126,39 @@ def upload_file():
     else:
         return jsonify({'error': 'Invalid file type'}), 400
 
+@app.route('/sample-upload', methods=['POST'])
+@cross_origin()
+def upload_sample_file():
+    setup_folders()
+
+    if 'file' not in request.files or len(request.files) != 1:
+        return jsonify({'error': 'Please upload exactly one file'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    if allowed_file(file.filename):
+        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        file.save(file_path)
+
+        if file.filename.lower().endswith(('.h5', '.hdf5')):
+            mainHDF5Method(file_path)
+        else:
+            with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                zip_ref.extractall('uploads/dicomImages')
+            
+            mainDICOMMethod('uploads/dicomImages', OUTPUT_FOLDER)
+
+        return jsonify({
+            'message': 'File successfully uploaded and processed',
+            'file_name': file.filename,
+            'file_size': os.path.getsize(file_path),
+            'file_path': file_path
+        }), 200
+    else:
+        return jsonify({'error': 'Invalid file type'}), 400
+
 @app.route('/output-files/folder-images', methods=['GET'])
 @cross_origin()
 def get_folder_images():

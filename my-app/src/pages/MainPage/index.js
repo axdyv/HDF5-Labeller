@@ -73,6 +73,35 @@ function MainPage() {
     }
   };
 
+  const handleSampleUpload = () => {
+    if (selectedFile) {
+      console.log('yas');
+      const formData = new FormData();
+      formData.append('file', selectedFile[0]);
+
+      setUploadingFileLoading(true);
+      axios.post(`http://127.0.0.1:5000/sample-upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
+      })
+
+      .then(response => {
+        console.log(`${fileType} file upload successful:`, response.data);
+        fileType === 'HDF5' ? fetchOutputHDF5Files() : fetchOutputHDF5Files(); // Refresh the output files list after upload
+      })
+      .catch(error => {
+        console.error(`Error uploading ${fileType} file:`, error);
+        setError(`Error uploading ${fileType} file.`);
+      })
+      .finally(() => {
+        setUploadingFileLoading(false);
+      });
+    } else {
+      setError('No file selected');
+    }
+  };
+
   useEffect(() => {
     console.log("came into use effect")
     fetch('http://localhost:5000/get-labels')
@@ -288,7 +317,7 @@ function MainPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
         <Paper elevation={3} style={{ width: '100%', margin: '0px 12px', padding: '12px' }}>
           <div>
-            <h2 style={{marginBottom: 12}}>Upload HDF5 File</h2>
+            <h2 style={{marginBottom: 12, width: '50%'}}>Upload HDF5 File</h2>
             <FormControl fullWidth margin="normal">
               <InputLabel id="file-type-label">File Type</InputLabel>
               <Select
@@ -300,8 +329,10 @@ function MainPage() {
               </Select>
             </FormControl>
             <CustomFileUpload files={selectedFile} setFiles={handleFileChange} accept={fileType === 'HDF5' ? '.h5,.hdf5' : '.zip'} disabled={uploadingFileLoading || !fileType} />
-            <Button onClick={handleUpload} variant="contained" style={{ width: '100%' }} disabled={!fileType || loading}>
-              {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px'}}/>} {uploadingFileLoading ? 'Uploading File' : 'Upload File'}
+            <Button onClick={handleSampleUpload} variant="contained" style={{ width: '50%' }} disabled={!fileType || loading}>
+              {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px'}}/>} {uploadingFileLoading ? 'Uploading Sample File' : 'Upload Sample File'}
+            </Button><Button onClick={handleUpload} variant="contained" style={{ width: '50%' }} disabled={!fileType || loading}>
+              {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px', color: 'white'}}/>} {uploadingFileLoading ? 'Uploading File' : 'Upload File'}
             </Button>
           </div>
           <div className="output-section">
@@ -322,7 +353,7 @@ function MainPage() {
                           {isDirectory 
                             ? <>
                                 <td>
-                                  <span onClick={() => handleHDF5DirectoryClick(file)} style={{ cursor: 'pointer', color: 'blue' }}>{file}</span>  
+                                  <span onClick={() => openImageGalleryModal(file)} style={{ cursor: 'pointer', color: 'blue' }}>{file}</span>  
                                 </td>
                                 <td style={{display: 'flex', alignItems: 'center'}}>
                                   {<Tooltip title="Download File">
@@ -334,12 +365,6 @@ function MainPage() {
                                   {<Tooltip title="View File">
                                       <IconButton>
                                         <VisibilityIcon onClick={() => openImageGalleryModal(file)}/>  
-                                      </IconButton>
-                                    </Tooltip>
-                                  }
-                                  {<Tooltip title="Label File">
-                                      <IconButton>
-                                        <BorderColorIcon onClick={() => openImageGalleryModal(file)}/>  
                                       </IconButton>
                                     </Tooltip>
                                   }
@@ -355,11 +380,12 @@ function MainPage() {
                                       <CloudDownloadIcon onClick={() => downloadFile(file)}/>
                                     </IconButton>
                                   </Tooltip>
-                                  <Tooltip title="Label File">
+                                  {<Tooltip title="View File">
                                       <IconButton>
-                                        <BorderColorIcon onClick={() => openModal(`http://127.0.0.1:5000/output-files/${file}`)}/>  
+                                        <VisibilityIcon onClick={() => openModal(`http://127.0.0.1:5000/output-files/${file}`)}/>  
                                       </IconButton>
                                     </Tooltip>
+                                  }
                                 </td>
                               </>
                             }
@@ -377,26 +403,6 @@ function MainPage() {
       <Dialog open={modalIsOpen} onClose={closeModal} maxWidth="lg" fullWidth={true}>
         <div style={{ textAlign: 'center' }}>
         <div>
-      <input
-        type="text"
-        placeholder="Filename"
-        value={filename}
-        onChange={(e) => setFilename(e.target.value)}
-      />
-      <FormControl fullWidth margin="normal">
-              <InputLabel id="file-type-label">File Type</InputLabel>
-              <Select
-                labelId="file-type-label"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-              >
-                <MenuItem value="images">Images</MenuItem>
-                <MenuItem value="labels">Labels</MenuItem>
-                <MenuItem value="data">Data</MenuItem>
-              </Select>
-            </FormControl>
-          <Button variant='contained' onClick={closeModal} style={{ marginTop: '20px' }}>Close</Button>
-          <Button type="submit" onClick={saveLabel} style={{ marginTop: '20px' }}>Save Label</Button>
     </div>
           {previewFile && (
             <div>
@@ -413,26 +419,6 @@ function MainPage() {
       <Dialog open={imageGalleryModalIsOpen} onClose={closeImageGalleryModal} fullWidth={true} maxWidth="lg">
         <div style={{ textAlign: 'center' }}>
           <h2>Image Gallery</h2>
-          <input
-        type="text"
-        placeholder="Filename"
-        value={filename}
-        onChange={(e) => setFilename(e.target.value)}
-          />
-          <FormControl fullWidth margin="normal">
-              <InputLabel id="file-type-label">File Type</InputLabel>
-              <Select
-                labelId="file-type-label"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-              >
-                <MenuItem value="images">Images</MenuItem>
-                <MenuItem value="labels">Labels</MenuItem>
-                <MenuItem value="data">Data</MenuItem>
-              </Select>
-            </FormControl>
-          <Button variant='contained' onClick={closeModal} style={{ marginTop: '20px' }}>Close</Button>
-          <Button type="submit" onClick={saveLabel} style={{ marginTop: '20px' }}>Save Label</Button>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
             {imageGallery.map((image, index) => (
               <LazyLoadImage key={index} src={image} alt={`Gallery ${index}`} style={{ width: '200px', margin: '10px' }} />
