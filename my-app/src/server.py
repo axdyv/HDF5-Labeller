@@ -32,6 +32,8 @@ def setup_folders():
         shutil.rmtree(UPLOAD_FOLDER)
     if os.path.exists('outputView'):
         shutil.rmtree('outputView')
+    if os.path.exists('labelInfo'):
+        shutil.rmtree('labelInfo')
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     os.makedirs('outputView', exist_ok=True)
@@ -250,12 +252,13 @@ def save_label():
         print(labelsFinished)
         if not labelsFinished:
             return jsonify({"message:"})
+        
+        with open('files_to_label.json', 'w') as f:
+            json.dump(files_to_label, f)
+        
         return jsonify({"message": "Labels saved successfully"}), 200
     except Exception as e:
         return jsonify({"message": "An error occurred: {str(e)}"}), 500
-        
-
-
 
 # HDF5 Parser
 def mainHDF5Method(file_path):
