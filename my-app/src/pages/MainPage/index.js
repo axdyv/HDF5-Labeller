@@ -33,23 +33,20 @@ function MainPage() {
   const [metadataTextModalIsOpen, setMetadataTextModalIsOpen] = useState(false);
   const [label, setLabel] = useState('image');
   const [filesToLabel, setFilesToLabel] = useState({});
-  const [data, setData] = useState({});
+  const [filesToLabelModalIsOpen, setFilesToLabelModalIsOpen] = useState(false);
   
 
   const handleFileChange = (files) => {
     setSelectedFile(files);
   };
 
-  useEffect(() => {
-    fetch('/api/data')
-      .then(response => response.json())
-      .then(data => setData(data))
-      .catch(error => console.error('Error fetching data:', error));
-  }, []);
-
+  const closeFilesToLabelModal = () => {
+    setFilesToLabelModalIsOpen(false)
+  }
 
   const handleUpload = () => {
     if (selectedFile) {
+      console.log('yas');
       const formData = new FormData();
       formData.append('file', selectedFile[0]);
 
@@ -75,6 +72,19 @@ function MainPage() {
       setError('No file selected');
     }
   };
+
+  useEffect(() => {
+    console.log("came into use effect")
+    fetch('http://localhost:5000/get-labels')
+      .then(response => response.json())
+      .then(filesToLabel => {
+          setFilesToLabel(filesToLabel)
+          if (filesToLabel) {
+            setFilesToLabelModalIsOpen(true);
+          }
+      })
+      .catch(error => console.error('Error fetching data:', error));
+  }, []);
 
   const fetchOutputHDF5Files = (path = '') => {
     setLoading(true);
@@ -150,6 +160,14 @@ function MainPage() {
     setModalIsOpen(false);
   };
 
+  const handleLabelChange = (filename, newLabel) => {
+    setFilesToLabel(prevFilesToLabel => ({
+      ...prevFilesToLabel,
+      [filename]: newLabel,
+    }));
+  };
+
+
   const openImageGalleryModal = (folder) => {
     axios.get(`http://127.0.0.1:5000/output-files/folder-images?folder=${folder}`)
       .then(response => {
@@ -188,8 +206,7 @@ function MainPage() {
   const saveLabel = async () => {
     try {
       const response = await axios.post('http://127.0.0.1:5000/save-label', {
-        filename: filename,
-        label: label,
+        filesToLabel: filesToLabel,
       }, {
         headers: {
           'Content-Type': 'application/json'
@@ -231,6 +248,20 @@ function MainPage() {
 
   const renderMetadataTextModalContent = () => {
     const { metadata = {}, text = {} } = metadataTextFiles;
+  
+  const renderFilesToLabelModalContent = () => {
+    return (
+      <div>
+        <h3>Files to Label</h3>
+        {Object.entries(filesToLabel).map(([filename, labels], index) => (
+          <div key={index} className="file-to-label">
+            <h4>{filename}</h4>
+            <pre>{JSON.stringify(labels, null, 2)}</pre>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
     return (
       <div>
@@ -274,10 +305,11 @@ function MainPage() {
             </Button>
           </div>
           <div className="App">
-            <h1>Data from Flask</h1>
-            <p>Name: {data.name}</p>
-            <p>Age: {data.age}</p>
-            <p>City: {data.city}</p>
+          <h1>Data from Flask</h1>
+            <p>TestData: {filesToLabel.testdata}</p>
+            <p>TestTarget: {filesToLabel.testtarget}</p>
+            <p>TrainData: {filesToLabel.traindata}</p>
+            <p>TrainTarget: {filesToLabel.testtarget}</p>
           </div>
           <div className="output-section">
             <h2>Output Files</h2>
@@ -423,6 +455,25 @@ function MainPage() {
           {renderMetadataTextModalContent()}
           <Button variant='contained' onClick={() => setMetadataTextModalIsOpen(false)} style={{ marginTop: '20px' }}>Close</Button>
         </div>
+      </Dialog>
+
+      <Dialog open={filesToLabelModalIsOpen} onClose={() => setFilesToLabelModalIsOpen(false)} style={{padding: '20px'}} maxWidth="lg" fullWidth={true}>
+      <div>
+      <h3>Edit Files To Label</h3>
+        {Object.entries(filesToLabel).map(([key, value], index) => (
+          <div key={index} className="files-to-label-item">
+            <h4>{key}</h4>
+            <textarea
+              value={value}
+              onChange={(e) => setFilesToLabel({ ...filesToLabel, [key]: e.target.value })}
+              rows={4}
+              style={{ width: '100%' }}
+            />
+          </div>
+        ))}
+        <Button variant="contained" onClick={closeFilesToLabelModal} style={{ marginTop: '20px' }}>Close</Button>
+        <Button type="submit" onClick={saveLabel} style={{ marginTop: '20px' }}>Save Changes</Button>
+      </div>
       </Dialog>
     </React.Fragment>
     

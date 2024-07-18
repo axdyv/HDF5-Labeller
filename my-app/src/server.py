@@ -23,6 +23,7 @@ METADATA_FOLDER = 'metadata'
 isHDF5 = False
 isDicom = False
 labels = {}
+labelsFinished = {}
 
 def setup_folders():
     if os.path.exists(OUTPUT_FOLDER):
@@ -34,6 +35,8 @@ def setup_folders():
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     os.makedirs('outputView', exist_ok=True)
+    labels = {}
+    labelsFinished = {}
     
 
 
@@ -231,17 +234,27 @@ def get_folder_metadata_text():
 
 # End of Upload/Output routes
 
-@app.route('/api/data', methods=['GET'])
+@app.route('/get-labels', methods=['GET'])
 @cross_origin()
 def get_data():
-    print('came into get labels')
-    # return jsonify(labels)
-    data = {
-        "name": "John Doe",
-        "age": 30,
-        "city": "New York"
-    }
-    return jsonify(data)
+    print("came into get data")
+    print(labels)
+    return jsonify(labels)
+
+@app.route('/save-label', methods=['POST'])
+@cross_origin
+def save_label():
+    try:
+        data = request.get_json()
+        labelsFinished = data.get('filesToLabel')
+        print(labelsFinished)
+        if not labelsFinished:
+            return jsonify({"message:"})
+        return jsonify({"message": "Labels saved successfully"}), 200
+    except Exception as e:
+        return jsonify({"message": "An error occurred: {str(e)}"}), 500
+        
+
 
 
 # HDF5 Parser
@@ -256,6 +269,7 @@ def mainHDF5Method(file_path):
         output_json_path = os.path.join('labelInfo', 'sampleStructure.json')
         with open(output_json_path, 'w') as json_file:
             json.dump(path_to_dataset, json_file, indent=True)
+        print("created labels")
     else:
         # time to verify and parse the new file
         with open('labelInfo/sampleStructure.json', 'r') as structureFile:
@@ -292,7 +306,7 @@ def sample_file_traversal(name, obj, path_to_dataset, labelCond):
         dataset_name = folders[-1]
         current_dict[dataset_name] = os.path.join('output', filePath + dataset_name + '(insert_type)')
         if (labelCond):
-            labels[filePath + dataset_name] = 'this is great'
+            labels[filePath + dataset_name] = '(insert-label-here)'
 
 def hdf5_ver_parsing(name, obj, path_to_dataset):
     if isinstance(obj, h5py.Group):
