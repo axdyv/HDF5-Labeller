@@ -32,13 +32,10 @@ def setup_folders():
         shutil.rmtree(UPLOAD_FOLDER)
     if os.path.exists('outputView'):
         shutil.rmtree('outputView')
-    if os.path.exists('labelInfo'):
-        shutil.rmtree('labelInfo')
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     os.makedirs('outputView', exist_ok=True)
     labels = {}
-    labelsFinished = {}
     
 
 
@@ -244,7 +241,7 @@ def get_data():
     return jsonify(labels)
 
 @app.route('/save-label', methods=['POST'])
-@cross_origin
+@cross_origin()
 def save_label():
     try:
         data = request.get_json()
@@ -253,8 +250,8 @@ def save_label():
         if not labelsFinished:
             return jsonify({"message:"})
         
-        with open('files_to_label.json', 'w') as f:
-            json.dump(files_to_label, f)
+        with open('labelInfo/fileLabels.json', 'w') as file:
+            json.dump(labelsFinished, file)
         
         return jsonify({"message": "Labels saved successfully"}), 200
     except Exception as e:
@@ -282,11 +279,12 @@ def mainHDF5Method(file_path):
             file.visititems(lambda name, obj: sample_file_traversal(name, obj, path_to_dataset, False))
         if (path_to_dataset != sampleStructure):
             return jsonify({'file does not match structure'}), 400
-        # with h5py.File(file_path, 'r') as file:
-        #     file.visititems(lambda name, obj: hdf5_ver_parsing(name, obj, path_to_dataset))
-        # output_json_path = os.path.join('output', 'nestedDict.json')
-        # with open(output_json_path, 'w') as json_file:
-        #     json.dump(path_to_dataset, json_file, indent=True)
+        print("finished structure verifications")
+        with h5py.File(file_path, 'r') as file:
+            file.visititems(lambda name, obj: hdf5_ver_parsing(name, obj, path_to_dataset))
+        output_json_path = os.path.join('output', 'nestedDict.json')
+        with open(output_json_path, 'w') as json_file:
+            json.dump(path_to_dataset, json_file, indent=True)
 
 def sample_file_traversal(name, obj, path_to_dataset, labelCond):
     if isinstance(obj, h5py.Group):
@@ -330,19 +328,25 @@ def hdf5_ver_parsing(name, obj, path_to_dataset):
             current_dict = current_dict.setdefault(folder, {})
             filePath = filePath + folder
         dataset_name = folders[-1]
-        if (("X" in name or "data" in name or "image" in name) and obj.ndim >= 2):
+        with open('labelInfo/fileLabels.json', 'r') as file:
+            labelsFinished = json.load(file)
+        type = str(labelsFinished[filePath + dataset_name]).lower()
+        if (type == 'images'):
             image_folder = os.path.join('output', filePath + dataset_name + "Images")
             os.makedirs(image_folder, exist_ok=True)
             imageDatasetHandling(obj, image_folder)
-            current_dict[dataset_name] = image_folder + "***"
-        elif obj.ndim >= 2:
-            data_path = os.path.join('output', filePath + dataset_name + "Data.npy")
-            np.save(data_path, np.array(obj))
-            current_dict[dataset_name] = data_path + "***"
-        elif obj.ndim == 1:
+            current_dict[dataset_name] = image_folder
+        elif (type == 'data'):
+            try:
+                data_path = os.path.join('output', filePath + dataset_name + "Data.npy")
+                np.save(data_path, np.array(obj))
+                current_dict[dataset_name] = data_path
+            except Exception as e:
+                print(data_path + " cannot be handled as data")
+        elif (type == 'labels'):
             labels_path = os.path.join('output', filePath + dataset_name + "Labels.json")
             save_labels(obj, labels_path)
-            current_dict[dataset_name] = labels_path + "***"
+            current_dict[dataset_name] = labels_path
 
 def traverse_hdf5(name, obj, path_to_dataset):
     if isinstance(obj, h5py.Group):
@@ -367,47 +371,53 @@ def traverse_hdf5(name, obj, path_to_dataset):
             image_folder = os.path.join('output', filePath + dataset_name + "Images")
             os.makedirs(image_folder, exist_ok=True)
             imageDatasetHandling(obj, image_folder)
-            current_dict[dataset_name] = image_folder + "***"
+            current_dict[dataset_name] = image_folder
         elif obj.ndim >= 2:
             data_path = os.path.join('output', filePath + dataset_name + "Data.npy")
             np.save(data_path, np.array(obj))
-            current_dict[dataset_name] = data_path + "***"
+            current_dict[dataset_name] = data_path
         elif obj.ndim == 1:
             labels_path = os.path.join('output', filePath + dataset_name + "Labels.json")
             save_labels(obj, labels_path)
-            current_dict[dataset_name] = labels_path + "***"
+            current_dict[dataset_name] = labels_path 
 
 def save_labels(obj, labels_path):
-    labels = np.array(obj)
-    num_images = labels.shape[0]
-    label_dict = {}
+    try:
+        labels = np.array(obj)
+        num_images = labels.shape[0]
+        label_dict = {}
 
-    for i in range(num_images):
-        if isinstance(labels[i], bytes):
-            label = labels[i].decode()
-        elif isinstance(labels[i], str):
-            label = labels[i]
-        else:
-            label = int(labels[i])
-        label_dict[f"img{i}.jpg"] = label
+        for i in range(num_images):
+            if isinstance(labels[i], bytes):
+                label = labels[i].decode()
+            elif isinstance(labels[i], str):
+                label = labels[i]
+            else:
+                label = int(labels[i])
+            label_dict[f"img{i}.jpg"] = label
 
-    with open(labels_path, 'w') as json_file:
-        json.dump(label_dict, json_file, indent=True)
+        with open(labels_path, 'w') as json_file:
+            json.dump(label_dict, json_file, indent=True)
+    except Exception as e:
+        print(labels + " cannot be handled as labels")
 
 def imageDatasetHandling(dataset, folder_name):
-    dataset = np.array(dataset)
-    dataset = np.abs(dataset)
-    scale_down = np.max(dataset) > 1
+    try:
+        dataset = np.array(dataset)
+        dataset = np.abs(dataset)
+        scale_down = np.max(dataset) > 1
 
-    if scale_down:
-        dataset = dataset / 255.0
+        if scale_down:
+            dataset = dataset / 255.0
 
-    size_of_dataset = dataset.shape[0]
-    for i in range(size_of_dataset):
-        image = dataset[i]
-        if dataset.ndim == 2:
-            image = image.reshape(int(math.sqrt(dataset.shape[1])), int(math.sqrt(dataset.shape[1])))
-        plt.imsave(os.path.join(folder_name, f"img{i}.jpg"), image)
+        size_of_dataset = dataset.shape[0]
+        for i in range(size_of_dataset):
+            image = dataset[i]
+            if dataset.ndim == 2:
+                image = image.reshape(int(math.sqrt(dataset.shape[1])), int(math.sqrt(dataset.shape[1])))
+            plt.imsave(os.path.join(folder_name, f"img{i}.jpg"), image)
+    except Exception as e:
+        print(folder_name + " cannot be handled as an images folder")
 
 def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'h5', 'hdf5', 'dcm', 'dicom', 'nii', 'zip'}

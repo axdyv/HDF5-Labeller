@@ -206,7 +206,7 @@ function MainPage() {
   const saveLabel = async () => {
     try {
       const response = await axios.post('http://127.0.0.1:5000/save-label', {
-        filesToLabel: filesToLabel,
+        'filesToLabel': filesToLabel,
       }, {
         headers: {
           'Content-Type': 'application/json'
@@ -303,13 +303,6 @@ function MainPage() {
             <Button onClick={handleUpload} variant="contained" style={{ width: '100%' }} disabled={!fileType || loading}>
               {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px'}}/>} {uploadingFileLoading ? 'Uploading File' : 'Upload File'}
             </Button>
-          </div>
-          <div className="App">
-          <h1>Data from Flask</h1>
-            <p>TestData: {filesToLabel.testdata}</p>
-            <p>TestTarget: {filesToLabel.testtarget}</p>
-            <p>TrainData: {filesToLabel.traindata}</p>
-            <p>TrainTarget: {filesToLabel.testtarget}</p>
           </div>
           <div className="output-section">
             <h2>Output Files</h2>
