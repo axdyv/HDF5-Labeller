@@ -74,6 +74,7 @@ function MainPage() {
   };
 
   const handleSampleUpload = () => {
+    setFilesToLabel({});
     if (selectedFile) {
       console.log('yas');
       const formData = new FormData();
@@ -102,18 +103,21 @@ function MainPage() {
     }
   };
 
-  useEffect(() => {
+  const loadSampleModal = () => {
     console.log("came into use effect")
-    fetch('http://localhost:5000/get-labels')
+    axios.get('http://localhost:5000/get-labels')
       .then(response => response.json())
       .then(filesToLabel => {
           setFilesToLabel(filesToLabel)
-          if (filesToLabel) {
-            setFilesToLabelModalIsOpen(true);
-          }
+          setFilesToLabelModalIsOpen(true);
       })
       .catch(error => console.error('Error fetching data:', error));
-  }, []);
+  };
+
+  const handleClick = () => {
+    handleSampleUpload();
+    loadSampleModal();
+  };
 
   const fetchOutputHDF5Files = (path = '') => {
     setLoading(true);
@@ -189,13 +193,6 @@ function MainPage() {
     setModalIsOpen(false);
   };
 
-  const handleLabelChange = (filename, newLabel) => {
-    setFilesToLabel(prevFilesToLabel => ({
-      ...prevFilesToLabel,
-      [filename]: newLabel,
-    }));
-  };
-
 
   const openImageGalleryModal = (folder) => {
     axios.get(`http://127.0.0.1:5000/output-files/folder-images?folder=${folder}`)
@@ -245,11 +242,6 @@ function MainPage() {
     } catch (error) {
       console.error('Error saving label:', error.response?.data || error.message);
     }
-  };
-
-  const handleHDF5DirectoryClick = (folder) => {
-    const newPath = `${currentHDF5Path}/${folder}`;
-    fetchOutputHDF5Files(newPath);
   };
 
   const handleHDF5BackClick = () => {
@@ -329,8 +321,8 @@ function MainPage() {
               </Select>
             </FormControl>
             <CustomFileUpload files={selectedFile} setFiles={handleFileChange} accept={fileType === 'HDF5' ? '.h5,.hdf5' : '.zip'} disabled={uploadingFileLoading || !fileType} />
-            <Button onClick={handleSampleUpload} variant="contained" style={{ width: '50%' }} disabled={!fileType || loading}>
-              {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px'}}/>} {uploadingFileLoading ? 'Uploading Sample File' : 'Upload Sample File'}
+            <Button onClick={handleClick} variant="contained" style={{ width: '50%' }} disabled={!fileType || loading}>
+              {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px', color: 'white'}}/>} {uploadingFileLoading ? 'Uploading Sample File' : 'Upload Sample File'}
             </Button><Button onClick={handleUpload} variant="contained" style={{ width: '50%' }} disabled={!fileType || loading}>
               {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px', color: 'white'}}/>} {uploadingFileLoading ? 'Uploading File' : 'Upload File'}
             </Button>

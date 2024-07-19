@@ -130,6 +130,8 @@ def upload_file():
 @cross_origin()
 def upload_sample_file():
     setup_folders()
+    if os.path.exists('labelInfo'):
+        shutil.rmtree('labelInfo')
 
     if 'file' not in request.files or len(request.files) != 1:
         return jsonify({'error': 'Please upload exactly one file'}), 400
