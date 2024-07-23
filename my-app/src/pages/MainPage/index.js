@@ -445,12 +445,20 @@ function MainPage() {
     {Object.entries(filesToLabel).map(([key, value], index) => (
       <div key={index} className="files-to-label-item">
         <h4>{key}</h4>
-        <textarea
-          value={value}
-          onChange={(e) => setFilesToLabel({ ...filesToLabel, [key]: e.target.value })}
-          rows={4}
-          style={{ width: '100%' }}
-        />
+        <FormControl fullWidth>
+        <InputLabel id="demo-simple-select-label">Age</InputLabel>
+  <Select
+    labelId="demo-simple-select-label"
+    id="demo-simple-select"
+    value={age}
+    label="Age"
+    onChange={handleChange}
+  >
+    <MenuItem value={10}>Ten</MenuItem>
+    <MenuItem value={20}>Twenty</MenuItem>
+    <MenuItem value={30}>Thirty</MenuItem>
+  </Select>
+</FormControl>
       </div>
     ))}
     <Button variant="contained" onClick={closeFilesToLabelModal} style={{ marginTop: '20px' }}>Close</Button>
