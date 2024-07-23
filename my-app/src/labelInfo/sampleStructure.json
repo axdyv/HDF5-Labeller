@@ -1,0 +1,10 @@
+{
+ "test": {
+  "data": "output/test->data(insert_type)",
+  "target": "output/test->target(insert_type)"
+ },
+ "train": {
+  "data": "output/train->data(insert_type)",
+  "target": "output/train->target(insert_type)"
+ }
+}

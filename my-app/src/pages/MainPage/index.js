@@ -446,19 +446,20 @@ function MainPage() {
       <div key={index} className="files-to-label-item">
         <h4>{key}</h4>
         <FormControl fullWidth>
-        <InputLabel id="demo-simple-select-label">Age</InputLabel>
-  <Select
-    labelId="demo-simple-select-label"
-    id="demo-simple-select"
-    value={age}
-    label="Age"
-    onChange={handleChange}
-  >
-    <MenuItem value={10}>Ten</MenuItem>
-    <MenuItem value={20}>Twenty</MenuItem>
-    <MenuItem value={30}>Thirty</MenuItem>
-  </Select>
-</FormControl>
+      <InputLabel id="simple-select-label">Label</InputLabel>
+      <Select
+        labelId="simple-select-label"
+        id="select-label"
+        value={value}
+        label="Labels"
+        onChange={(e) => setFilesToLabel({ ...filesToLabel, [key]: e.target.value })}
+        style={{marginBottom: 12, width: '50%'}}
+      >
+        <MenuItem value={"images"}>Images</MenuItem>
+        <MenuItem value={"labels"}>Labels</MenuItem>
+        <MenuItem value={"data"}>Data</MenuItem>
+      </Select>
+      </FormControl>
       </div>
     ))}
     <Button variant="contained" onClick={closeFilesToLabelModal} style={{ marginTop: '20px' }}>Close</Button>
