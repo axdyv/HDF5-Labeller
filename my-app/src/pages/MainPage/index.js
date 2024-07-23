@@ -105,6 +105,7 @@ function MainPage() {
     try {
       const response = await axios.get('http://localhost:5000/get-labels');
       console.log("Response from /get-labels:", response.data);
+      setFilesToLabel({});
       const filesToLabel = response.data; // Assuming the data is already parsed
       setFilesToLabel(filesToLabel);
       setFilesToLabelModalIsOpen(true);

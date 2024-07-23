@@ -24,6 +24,7 @@ isHDF5 = False
 isDicom = False
 labels = {}
 labelsFinished = {}
+labelsForView = {}
 
 def setup_folders():
     if os.path.exists(OUTPUT_FOLDER):
@@ -129,7 +130,15 @@ def upload_file():
 @app.route('/sample-upload', methods=['POST'])
 @cross_origin()
 def upload_sample_file():
+    if os.path.exists(OUTPUT_FOLDER):
+        shutil.rmtree(OUTPUT_FOLDER)
+    if os.path.exists(UPLOAD_FOLDER):
+        shutil.rmtree(UPLOAD_FOLDER)
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     setup_folders()
+    labels = {}
+    labelsFinished = {}
     if os.path.exists('labelInfo'):
         shutil.rmtree('labelInfo')
 
@@ -295,6 +304,8 @@ def save_label():
 # HDF5 Parser
 def mainHDF5Method(file_path):
     isHDF5 = True
+    labels.clear()
+    labelsFinished.clear()
     if (not os.path.exists("labelInfo/sampleStructure.json")):
         # create a format based on sample file and ask user to annotate labels
         os.makedirs("labelInfo")
@@ -336,9 +347,10 @@ def sample_file_traversal(name, obj, path_to_dataset, labelCond):
         current_dict = path_to_dataset
         filePath = ""
         folders = name.split('/')
+        print(folders)
         for folder in folders[:-1]:
             current_dict = current_dict.setdefault(folder, {})
-            filePath = filePath + folder
+            filePath = filePath + folder + "->"
         dataset_name = folders[-1]
         current_dict[dataset_name] = os.path.join('output', filePath + dataset_name + '(insert_type)')
         if (labelCond):
@@ -361,7 +373,7 @@ def hdf5_ver_parsing(name, obj, path_to_dataset):
         folders = name.split('/')
         for folder in folders[:-1]:
             current_dict = current_dict.setdefault(folder, {})
-            filePath = filePath + folder
+            filePath = filePath + folder + "->"
         dataset_name = folders[-1]
         with open('labelInfo/fileLabels.json', 'r') as file:
             labelsFinished = json.load(file)
