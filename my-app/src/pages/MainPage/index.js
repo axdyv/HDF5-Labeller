@@ -17,7 +17,9 @@ import Dialog from '@mui/material/Dialog';
 function MainPage() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [outputHDF5Files, setOutputHDF5Files] = useState([]);
+  const [outputDICOMFiles, setOutputDICOMFiles] = useState([]);
   const [currentHDF5Path, setCurrentHDF5Path] = useState('');
+  const [currentDICOMPath, setCurrentDICOMPath] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [fileType, setFileType] = useState('');
@@ -34,10 +36,17 @@ function MainPage() {
   const [label, setLabel] = useState('image');
   const [filesToLabel, setFilesToLabel] = useState({});
   const [filesToLabelModalIsOpen, setFilesToLabelModalIsOpen] = useState(false);
+  const[sampleUploadDisabled, setSampleUploadDisabled] = useState(false);
   
 
   const handleFileChange = (files) => {
     setSelectedFile(files);
+  };
+
+  const handleFileType = (e) => {
+    const selectedFileType = e.target.value;
+    setFileType(selectedFileType);
+    setSampleUploadDisabled(selectedFileType === 'DICOM');
   };
 
   const closeFilesToLabelModal = () => {
@@ -59,7 +68,7 @@ function MainPage() {
 
       .then(response => {
         console.log(`${fileType} file upload successful:`, response.data);
-        fileType === 'HDF5' ? fetchOutputHDF5Files() : fetchOutputHDF5Files(); // Refresh the output files list after upload
+        fileType === 'HDF5' ? fetchOutputHDF5Files() : fetchOutputDICOMFiles(); // Refresh the output files list after upload
       })
       .catch(error => {
         console.error(`Error uploading ${fileType} file:`, error);
@@ -75,7 +84,6 @@ function MainPage() {
 
   const handleSampleUpload = async () => {
     if (selectedFile) {
-      console.log('yas');
       const formData = new FormData();
       formData.append('file', selectedFile[0]);
   
@@ -87,7 +95,7 @@ function MainPage() {
           }
         });
         console.log(`${fileType} file upload successful:`, response.data);
-        fileType === 'HDF5' ? fetchOutputHDF5Files() : fetchOutputHDF5Files(); // Refresh the output files list after upload
+        fileType === 'HDF5' ? fetchOutputHDF5Files() : fetchOutputDICOMFiles(); // Refresh the output files list after upload
       } catch (error) {
         console.error(`Error uploading ${fileType} file:`, error);
         setError(`Error uploading ${fileType} file.`);
@@ -112,6 +120,7 @@ function MainPage() {
       console.log("Set modal open state to true");
     } catch (error) {
       console.error('Error fetching data:', error);
+      setError(`Error fetching data:`);
     }
   };
   
@@ -127,8 +136,6 @@ function MainPage() {
       console.error('Error handling sample upload and loading modal:', error);
     }
   };
-  
-  
 
   const fetchOutputHDF5Files = (path = '') => {
     setLoading(true);
@@ -142,6 +149,24 @@ function MainPage() {
       .catch(error => {
         console.error('Error fetching HDF5 output files:', error);
         setError('Error fetching HDF5 output files.');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
+  const fetchOutputDICOMFiles = (path = '') => {
+    setLoading(true);
+    axios.get(`http://127.0.0.1:5000/output-files?path=${path}`)
+      .then(response => {
+        console.log('Fetched DICOM output files:', response.data);
+        setOutputDICOMFiles(response.data);
+        setCurrentDICOMPath(path);
+        setError(null);
+      })
+      .catch(error => {
+        console.error('Error fetching DICOM output files:', error);
+        setError('Error fetching DICOM output files.');
       })
       .finally(() => {
         setLoading(false);
@@ -262,6 +287,13 @@ function MainPage() {
     fetchOutputHDF5Files(newPath);
   };
 
+  const handleDICOMBackClick = () => {
+    const pathSegments = currentDICOMPath.split('/').filter(segment => segment);
+    pathSegments.pop();
+    const newPath = pathSegments.join('/');
+    fetchOutputDICOMFiles(newPath);
+  };
+
   const renderHDF5Breadcrumbs = () => {
     const paths = currentHDF5Path.split('/').filter(path => path);
     return (
@@ -269,6 +301,20 @@ function MainPage() {
         <span onClick={() => fetchOutputHDF5Files('')}>Home</span>
         {paths.map((path, index) => (
           <span key={index} onClick={() => fetchOutputHDF5Files(paths.slice(0, index + 1).join('/'))}>
+            {path}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  const renderDICOMBreadcrumbs = () => {
+    const paths = currentDICOMPath.split('/').filter(path => path);
+    return (
+      <div className="breadcrumbs">
+        <span onClick={() => fetchOutputDICOMFiles('')}>Home</span>
+        {paths.map((path, index) => (
+          <span key={index} onClick={() => fetchOutputDICOMFiles(paths.slice(0, index + 1).join('/'))}>
             {path}
           </span>
         ))}
@@ -319,30 +365,53 @@ function MainPage() {
     <React.Fragment>
       <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
         <Paper elevation={3} style={{ width: '100%', margin: '0px 12px', padding: '12px' }}>
-          <div>
-            <h2 style={{marginBottom: 12, width: '50%'}}>Upload HDF5 File</h2>
-            <FormControl fullWidth margin="normal">
-              <InputLabel id="file-type-label">File Type</InputLabel>
-              <Select
-                labelId="file-type-label"
-                value={fileType}
-                onChange={(e) => setFileType(e.target.value)}
-              >
-                <MenuItem value="HDF5">HDF5</MenuItem>
-              </Select>
-            </FormControl>
-            <CustomFileUpload files={selectedFile} setFiles={handleFileChange} accept={fileType === 'HDF5' ? '.h5,.hdf5' : '.zip'} disabled={uploadingFileLoading || !fileType} />
-            <Button onClick={handleClick} variant="contained" style={{ width: '50%' }} disabled={!fileType || loading}>
-              {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px', color: 'white'}}/>} {uploadingFileLoading ? 'Uploading Sample File' : 'Upload Sample File'}
-            </Button><Button onClick={handleUpload} variant="contained" style={{ width: '50%' }} disabled={!fileType || loading}>
-              {uploadingFileLoading && <CircularProgress size={25}  style={{marginRight: '16px', color: 'white'}}/>} {uploadingFileLoading ? 'Uploading File' : 'Upload File'}
-            </Button>
-          </div>
+        <div>
+      <FormControl fullWidth margin="normal">
+        <InputLabel id="file-type-label">File Type</InputLabel>
+        <Select
+          labelId="file-type-label"
+          value={fileType}
+          onChange={handleFileType}
+        >
+          <MenuItem value="HDF5">HDF5</MenuItem>
+          <MenuItem value="DICOM">DICOM</MenuItem>
+        </Select>
+      </FormControl>
+      <CustomFileUpload
+        files={selectedFile}
+        setFiles={handleFileChange}
+        accept={fileType === 'HDF5' ? '.h5,.hdf5' : '.zip'}
+        disabled={uploadingFileLoading || !fileType}
+      />
+      <Button
+        onClick={handleClick}
+        variant="contained"
+        style={{ width: '50%' }}
+        disabled={!fileType || loading || sampleUploadDisabled}
+      >
+        {uploadingFileLoading && (
+          <CircularProgress size={25} style={{ marginRight: '16px', color: 'white' }} />
+        )}
+        {uploadingFileLoading ? 'Uploading Sample File' : 'Upload Sample File'}
+      </Button>
+      <Button
+        onClick={handleUpload}
+        variant="contained"
+        style={{ width: '50%' }}
+        disabled={!fileType || loading}
+      >
+        {uploadingFileLoading && (
+          <CircularProgress size={25} style={{ marginRight: '16px', color: 'white' }} />
+        )}
+        {uploadingFileLoading ? 'Uploading File' : 'Upload File'}
+      </Button>
+    </div>
           <div className="output-section">
             <h2>Output Files</h2>
             {error && <p className="error">{error}</p>}
             {fileType === 'HDF5' ? renderHDF5Breadcrumbs() : renderHDF5Breadcrumbs()}
             {fileType === 'HDF5' && currentHDF5Path && <button onClick={handleHDF5BackClick}>Back</button>}
+            {fileType === 'DICOM' && currentDICOMPath && <button onClick={handleDICOMBackClick}>Back</button>}
             {fileType === 'HDF5' && (
               outputHDF5Files.length === 0 ? (
                 <p>No HDF5 files available.</p>
@@ -399,6 +468,50 @@ function MainPage() {
                  </table>
                 )
             )} 
+            {fileType === 'DICOM' && (
+              outputDICOMFiles.length === 0 ? (
+                <p>No DICOM files available.</p>
+              ) : (
+                <table>
+                  {outputDICOMFiles.map((file, index) => {
+                    console.log('file ==>', file)
+                    const isDirectory = !file.includes('.');
+                    console.log('is directory====>', isDirectory)
+                    return (
+                      <tr key={index}>
+                        {isDirectory && (
+                          <>
+                            <td>
+                            <span>{file}</span>  
+                            </td>
+                            <td>
+                              {<Tooltip title="Download Folder">
+                                  <IconButton>
+                                    <CloudDownloadIcon onClick={() => downloadFolder(file)} />  
+                                  </IconButton>
+                                </Tooltip>
+                              }
+                              {<Tooltip title="View Files">
+                                  <IconButton>
+                                    <VisibilityIcon onClick={() => fetchMetadataAndTextFiles(file)}/>  
+                                  </IconButton>
+                                </Tooltip>
+                              }
+                              {<Tooltip title="View Folder">
+                                  <IconButton>
+                                    <FolderIcon onClick={() => openImageGalleryModal(file)}/>  
+                                  </IconButton>
+                                </Tooltip>
+                              }
+                            </td>
+                          </> 
+                        )}
+                      </tr>
+                    );
+                  })}
+                </table>
+              )
+            )}
           </div>
         </Paper>
       </div>

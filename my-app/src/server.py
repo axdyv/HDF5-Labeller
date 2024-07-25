@@ -13,6 +13,8 @@ from io import BytesIO
 import zipfile
 from collections import deque
 import time
+import pydicom
+import nibabel as nib
 
 app = Flask(__name__,)
 CORS(app)
@@ -301,6 +303,165 @@ def save_label():
     except Exception as e:
         return jsonify({"message": "An error occurred: {str(e)}"}), 500
 
+FIELDS = [
+    'AccessionNumber', 'AcquisitionMatrix', 'B1rms', 'BitsAllocated', 'BitsStored', 'Columns',
+    'ConversionType', 'DiffusionBValue', 'DiffusionGradientOrientation', 'EchoNumbers', 'EchoTime',
+    'EchoTrainLength', 'FlipAngle', 'HighBit', 'HighRRValue', 'ImageDimensions', 'ImageFormat',
+    'ImageGeometryType', 'ImageLocation', 'ImageOrientation', 'ImageOrientationPatient', 'ImagePosition',
+    'ImagePositionPatient', 'ImageType', 'ImagedNucleus', 'ImagingFrequency', 'InPlanePhaseEncodingDirection',
+    'InStackPositionNumber', 'InstanceNumber', 'InversionTime', 'Laterality', 'LowRRValue', 'MRAcquisitionType',
+    'MagneticFieldStrength', 'Modality', 'NumberOfAverages', 'NumberOfPhaseEncodingSteps', 'PatientID',
+    'PatientName', 'PatientPosition', 'PercentPhaseFieldOfView', 'PercentSampling', 'PhotometricInterpretation',
+    'PixelBandwidth', 'PixelPaddingValue', 'PixelRepresentation', 'PixelSpacing', 'PlanarConfiguration',
+    'PositionReferenceIndicator', 'PresentationLUTShape', 'ReconstructionDiameter', 'RescaleIntercept',
+    'RescaleSlope', 'RescaleType', 'Rows', 'SAR', 'SOPClassUID', 'SOPInstanceUID', 'SamplesPerPixel',
+    'SeriesDescription', 'SeriesInstanceUID', 'SeriesNumber', 'SliceLocation', 'SliceThickness',
+    'SpacingBetweenSlices', 'SpatialResolution', 'SpecificCharacterSet', 'StudyInstanceUID', 'TemporalResolution',
+    'TransferSyntaxUID', 'TriggerWindow', 'WindowCenter', 'WindowWidth'
+]
+
+def convert_to_jpg(image_data, output_path):
+    plt.imshow(image_data, cmap=plt.cm.bone)
+    plt.axis('off')
+    plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+def extract_dicom_metadata(dicom_path):
+    ds = pydicom.dcmread(dicom_path)
+    metadata = {}
+    for field in FIELDS:
+        if hasattr(ds, field):
+            metadata[field] = str(getattr(ds, field))
+    return metadata
+
+def convert_np_float32(obj):
+    if isinstance(obj, np.float32):
+        return float(obj)
+    raise TypeError
+
+def extract_nifti_metadata(nifti_path):
+    img = nib.load(nifti_path)
+    header = img.header
+    metadata = {
+        "dim": header.get_data_shape(),
+        "datatype": header.get_data_dtype().name,
+        "voxel_size": header.get_zooms(),
+        "descrip": header['descrip'].item().decode('utf-8'),
+        "xyzt_units": header.get_xyzt_units(),
+        "qform_code": int(header['qform_code']),
+        "sform_code": int(header['sform_code']),
+    }
+    for key, value in metadata.items():
+        if isinstance(value, np.float32):
+            metadata[key] = float(value)
+    return metadata
+
+def create_output_structure(input_folder, output_folder):
+    for root, dirs, files in os.walk(input_folder):
+        for dir_name in dirs:
+            relative_path = os.path.relpath(os.path.join(root, dir_name), input_folder)
+            os.makedirs(os.path.join(output_folder, relative_path, 'image'), exist_ok=True)
+            os.makedirs(os.path.join(output_folder, relative_path, 'meta'), exist_ok=True)
+            os.makedirs(os.path.join(output_folder, relative_path, 'text'), exist_ok=True)
+
+def process_files(input_folder, output_folder):
+    for root, dirs, files in os.walk(input_folder):
+        for file in files:
+            file_path = os.path.join(root, file)
+
+            if file.endswith('.dcm'):
+                relative_path = os.path.relpath(root, input_folder)
+
+                image_name = os.path.splitext(file)[0] + '.jpg'
+                image_output_path = os.path.join(output_folder, relative_path, 'image', image_name.replace("./", ''))
+                meta_output_path = os.path.join(output_folder, relative_path, 'meta', os.path.splitext(file)[0] + '.json')
+                text_output_path = os.path.join(output_folder, relative_path, 'text', 'file.txt')
+
+                os.makedirs(os.path.dirname(image_output_path), exist_ok=True)
+
+                ds = pydicom.dcmread(file_path)
+                convert_to_jpg(ds.pixel_array, image_output_path)
+
+                metadata = extract_dicom_metadata(file_path)
+
+                with open(meta_output_path, 'w') as meta_file:
+                    json.dump(metadata, meta_file, default=convert_np_float32, indent=4)
+
+                os.makedirs(os.path.dirname(text_output_path), exist_ok=True)
+                with open(text_output_path, 'a') as text_file:
+                    text_file.write(f'{{"{image_name}": "{os.path.basename(meta_output_path)}"}}\n')
+
+            elif file.endswith('.nii') or file.endswith('.nii.gz'):
+                try:
+                    img = nib.load(file_path)
+                except nib.filebasedimages.ImageFileError:
+                    print(f"Skipping file: {file_path} - Not a valid NIfTI file")
+                    continue
+
+                relative_path = os.path.relpath(root, input_folder)
+                image_name = os.path.splitext(file)[0] + '.jpg'
+                image_output_path = os.path.join(output_folder, relative_path, 'image', image_name.replace("./", ''))
+                meta_output_path = os.path.join(output_folder, relative_path, 'meta', os.path.splitext(file)[0] + '.json')
+                text_output_path = os.path.join(output_folder, relative_path, 'text', 'file.txt')
+
+                os.makedirs(os.path.dirname(image_output_path), exist_ok=True)
+
+                data = img.get_fdata()
+                middle_slice = data[:, :, data.shape[2] // 2]
+
+                convert_to_jpg(middle_slice, image_output_path)
+
+                metadata = extract_nifti_metadata(file_path)
+
+                with open(meta_output_path, 'w') as meta_file:
+                    json.dump(metadata, meta_file, default=convert_np_float32, indent=4)
+
+                os.makedirs(os.path.dirname(text_output_path), exist_ok=True)
+                with open(text_output_path, 'a') as text_file:
+                    text_file.write(f'{{"{image_name}": "{os.path.basename(meta_output_path)}"}}\n')
+
+def delete_empty_folders(): 
+    root = 'output'
+    deleted = set()
+    for current_dir, subdirs, files in os.walk(root, topdown=False):
+
+        still_has_subdirs = False
+        for subdir in subdirs:
+            if os.path.join(current_dir, subdir) not in deleted:
+                still_has_subdirs = True
+                break
+        if not any(files) and not still_has_subdirs:
+            os.rmdir(current_dir)
+    return deleted
+
+def output_for_visualization():
+    i = 0
+    for dirpath, dirnames, files in os.walk('output'):
+        for dir in dirnames:
+            if (dir == 'image'):
+                print(os.path.join(dirpath, dir))
+                shutil.copytree(os.path.join(dirpath, dir), os.path.join('outputView', 'imageNew' + str(i)))
+            if (dir == 'meta'):
+                print(os.path.join(dirpath, dir))
+                shutil.copytree(os.path.join(dirpath, dir), os.path.join('outputView', 'metaNew' + str(i)))
+            if (dir == 'text'):
+                print(os.path.join(dirpath, dir))
+                shutil.copytree(os.path.join(dirpath, dir), os.path.join('outputView','textNew' + str(i)))
+                i += 1
+    return 0
+
+def mainDICOMMethod(input_folder, output_folder):
+    isDicom = True
+    isExist = os.path.exists('outputView')
+    if(isExist):
+        print("outputView exists")
+    else:
+        os.mkdir('outputView')
+    create_output_structure(input_folder, output_folder)
+    process_files(input_folder, output_folder)
+    delete_empty_folders()
+    output_for_visualization()
+
 # HDF5 Parser
 def mainHDF5Method(file_path):
     isHDF5 = True
@@ -429,7 +590,7 @@ def traverse_hdf5(name, obj, path_to_dataset):
             current_dict[dataset_name] = labels_path 
 
 def save_labels(obj, labels_path):
-    try:
+    # try:
         labels = np.array(obj)
         num_images = labels.shape[0]
         label_dict = {}
@@ -445,11 +606,11 @@ def save_labels(obj, labels_path):
 
         with open(labels_path, 'w') as json_file:
             json.dump(label_dict, json_file, indent=True)
-    except Exception as e:
-        print(labels + " cannot be handled as labels")
+    # except Exception as e:
+    #     print("cannot be handled as labels")
 
 def imageDatasetHandling(dataset, folder_name):
-    try:
+    # try:
         dataset = np.array(dataset)
         dataset = np.abs(dataset)
         scale_down = np.max(dataset) > 1
@@ -463,8 +624,9 @@ def imageDatasetHandling(dataset, folder_name):
             if dataset.ndim == 2:
                 image = image.reshape(int(math.sqrt(dataset.shape[1])), int(math.sqrt(dataset.shape[1])))
             plt.imsave(os.path.join(folder_name, f"img{i}.jpg"), image)
-    except Exception as e:
-        print(folder_name + " cannot be handled as an images folder")
+    # except Exception as e:
+    #     shutil.rmtree(folder_name)
+    #     print(folder_name + " cannot be handled as an images folder")
 
 def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'h5', 'hdf5', 'dcm', 'dicom', 'nii', 'zip'}
