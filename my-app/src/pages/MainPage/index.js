@@ -474,9 +474,7 @@ function MainPage() {
               ) : (
                 <table>
                   {outputDICOMFiles.map((file, index) => {
-                    console.log('file ==>', file)
                     const isDirectory = !file.includes('.');
-                    console.log('is directory====>', isDirectory)
                     return (
                       <tr key={index}>
                         {isDirectory && (
