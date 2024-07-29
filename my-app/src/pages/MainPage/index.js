@@ -37,6 +37,7 @@ function MainPage() {
   const [filesToLabel, setFilesToLabel] = useState({});
   const [filesToLabelModalIsOpen, setFilesToLabelModalIsOpen] = useState(false);
   const[sampleUploadDisabled, setSampleUploadDisabled] = useState(false);
+  const [isImages, setIsImages] = useState(false)
   
 
   const handleFileChange = (files) => {
@@ -227,6 +228,15 @@ function MainPage() {
   const closeModal = () => {
     setPreviewFile(null);
     setModalIsOpen(false);
+  };
+
+  const displayModal = (folder) => {
+    if (folder.toLowerCase().includes("image")) {
+      openImageGalleryModal(folder);
+    } else {
+      fetchMetadataAndTextFiles(folder);
+    }
+  
   };
 
 
@@ -491,13 +501,7 @@ function MainPage() {
                               }
                               {<Tooltip title="View Files">
                                   <IconButton>
-                                    <VisibilityIcon onClick={() => fetchMetadataAndTextFiles(file)}/>  
-                                  </IconButton>
-                                </Tooltip>
-                              }
-                              {<Tooltip title="View Folder">
-                                  <IconButton>
-                                    <FolderIcon onClick={() => openImageGalleryModal(file)}/>  
+                                    <VisibilityIcon onClick={() => displayModal(file)}/>  
                                   </IconButton>
                                 </Tooltip>
                               }
