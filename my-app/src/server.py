@@ -54,6 +54,7 @@ def list_output_files():
         if os.path.isfile(first_file) and zipfile.is_zipfile(first_file):
             VISUALIZATION_FOLDER = 'outputView'
     directory = os.path.join(VISUALIZATION_FOLDER, path)
+    print("directory = " + directory)
     if not os.path.exists(directory):
         return jsonify({'error': 'Directory not found'}), 404
 
@@ -114,11 +115,13 @@ def upload_file():
 
         if file.filename.lower().endswith(('.h5', '.hdf5')):
             mainHDF5Method(file_path)
+        elif file.filename.lower().endswith(('.dcm', '.dicom')):
+            mainDICOMMethod('uploads', OUTPUT_FOLDER)
         else:
             with zipfile.ZipFile(file_path, 'r') as zip_ref:
                 zip_ref.extractall('uploads/dicomImages')
-            
             mainDICOMMethod('uploads/dicomImages', OUTPUT_FOLDER)
+            
 
         return jsonify({
             'message': 'File successfully uploaded and processed',
@@ -461,6 +464,8 @@ def mainDICOMMethod(input_folder, output_folder):
     process_files(input_folder, output_folder)
     delete_empty_folders()
     output_for_visualization()
+
+    shutil.rmtree("uploads/dicomImages")
 
 # HDF5 Parser
 def mainHDF5Method(file_path):

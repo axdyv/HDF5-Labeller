@@ -390,7 +390,7 @@ function MainPage() {
       <CustomFileUpload
         files={selectedFile}
         setFiles={handleFileChange}
-        accept={fileType === 'HDF5' ? '.h5,.hdf5' : '.zip'}
+        accept={fileType === 'HDF5' ? '.h5,.hdf5' : '.zip, .dcm'}
         disabled={uploadingFileLoading || !fileType}
       />
       <Button
